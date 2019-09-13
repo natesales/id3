@@ -24,26 +24,17 @@ func handle(e error) {
 	}
 }
 
-type Entry struct {
-	PlayTennis  string
-	Outlook     string
-	Temperature string
-	Humidity    string
-	Wind        string
-}
-
-func readDataSet(filename string) ([]Entry, []Entry, []Entry) {
+func readDataSet(filename string) ([]map[string]string, []map[string]string) {
 
 	/**
 	 * readDataSet
 	 * Description: Read data from text file randomly into slices of Entry objects.
 	 * filename: string Path to text file for reading
-	 * returns 2 []Entry objects containing random values from filename as well as a third with all the Entry objects
+	 * returns 2 []map[string]string objects containing random values from filename
 	 */
 
-	var training []Entry
-	var testing []Entry
-	var total []Entry
+	var training []map[string]string
+	var testing []map[string]string
 
 	r := rand.New(rand.NewSource(time.Now().Unix())) // Not a good seed. TODO
 
@@ -58,16 +49,16 @@ func readDataSet(filename string) ([]Entry, []Entry, []Entry) {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		if first { // Skip the first line since it contains the header. TODO: Better way to do this?
+		if first { // Skip the first line since it contains the header. TODO: Dont use struct, use a map
 			first = false
 		} else {
 			entry := strings.Split(scanner.Text(), ",")
-			newEntry := Entry{
-				PlayTennis:  entry[0],
-				Outlook:     entry[1],
-				Temperature: entry[2],
-				Humidity:    entry[3],
-				Wind:        entry[4],
+			newEntry := map[string]string{
+				"PlayTennis":  entry[0],
+				"Outlook":     entry[1],
+				"Temperature": entry[2],
+				"Humidity":    entry[3],
+				"Wind":        entry[4],
 			}
 
 			if r.Intn(2) == 1 {
@@ -75,24 +66,23 @@ func readDataSet(filename string) ([]Entry, []Entry, []Entry) {
 			} else {
 				testing = append(testing, newEntry)
 			}
-			total = append(total, newEntry)
 		}
 
 	}
 
-	return training, testing, total
+	return training, testing
 }
 
-func entropy(entries []Entry) float64 { // TODO: Should this be float64? Its what Log2 returns.
+func Entropy(entries []map[string]string) float64 { // TODO: Should this be float64? Its what Log2 returns.
 	var pYes float64
 	var pNo float64
 	for _, entry := range entries {
-		if entry.PlayTennis == "yes" {
+		if entry["PlayTennis"] == "yes" {
 			pYes++
-		} else if entry.PlayTennis == "no" {
+		} else if entry["PlayTennis"] == "no" {
 			pNo++
 		} else {
-			log.Fatalf("PlayTennis is neither yes or no. It's " + entry.PlayTennis)
+			log.Fatalf("PlayTennis is neither yes or no. It's " + entry["PlayTennis"])
 		}
 	}
 	pYes /= pYes + pNo
@@ -100,17 +90,20 @@ func entropy(entries []Entry) float64 { // TODO: Should this be float64? Its wha
 	return -(pYes * math.Log2(pYes)) - (pNo * math.Log2(pNo))
 }
 
+//func Gain(S []map[string]string, A string) float64 { // TODO: A is going to be problematic
+//	return Entropy(S) - (math.Abs(Sv1)/float64(len(S)))*Entropy(Sv1) - (math.Abs(Sv2)/float64(len(S)))*Entropy(Sv2)
+//}
+
 func main() {
-	var training []Entry
-	var testing []Entry
-	var total []Entry
+	var training []map[string]string
+	var testing []map[string]string
 
-	training, testing, total = readDataSet("data/tennis.txt")
+	training, testing = readDataSet("data/tennis.txt")
+	//
+	//fmt.Println("Training entropy: ", Entropy(training))
+	//fmt.Println("Testing entropy: ", Entropy(testing))
 
-	fmt.Println("Training entropy: ", entropy(training))
-	fmt.Println("Testing entropy: ", entropy(testing))
-
-	fmt.Println("Total entropy: ", entropy(total))
+	fmt.Println(Entropy(append(training, testing...))) // ... is to
 
 	//for i, line := range training {
 	//	fmt.Println(i, line)
