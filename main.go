@@ -5,7 +5,9 @@ package main
 
 import (
 	"bufio"
+	"encoding/csv"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"os"
@@ -49,25 +51,31 @@ func readDataSet(filename string) ([]map[string]string, []map[string]string) {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		entry := strings.Split(scanner.Text(), ",")
+		reader := csv.NewReader(strings.NewReader(scanner.Text()))
 
-		if len(header) == 0 { // Skip the first line since it contains the header.
-			header = entry
-		} else {
-			newEntry := make(map[string]string)
-
-			for i, item := range header {
-				//fmt.Println("Assigning " + item + " to " + entry[i])
-				newEntry[item] = entry[i]
+		for {
+			entry, err := reader.Read()
+			if err == io.EOF {
+				break
 			}
+			handle(err)
 
-			if r.Intn(2) == 1 { // Split it up in roughly half
-				training = append(training, newEntry)
+			if len(header) == 0 { // Skip the first line since it contains the header.
+				header = entry
 			} else {
-				testing = append(testing, newEntry)
+				newEntry := make(map[string]string)
+
+				for i, item := range header {
+					newEntry[item] = entry[i]
+				}
+
+				if r.Intn(2) == 1 { // Split it up in roughly half
+					training = append(training, newEntry)
+				} else {
+					testing = append(testing, newEntry)
+				}
 			}
 		}
-
 	}
 
 	return training, testing
@@ -108,17 +116,19 @@ func Gain(S []map[string]string, A string) float64 {
 	 * returns: float64, entropy gain value
 	 */
 
-	var Sv1 []map[string]string
-	var Sv2 []map[string]string
+	gain := Entropy(S)
+	values := make(map[string][]map[string]string) // All the possible values of A
 
-	for _ /* index */, entry := range S { //TODO: where do the 2 possible values come from?
-		if entry[A] == "yes" {
-			Sv1 = append(Sv1, entry)
-		} else if entry[A] == "no" {
-			Sv2 = append(Sv2, entry)
-		}
+	for _, entry := range S { // Fill values map up with how many of each value of A there is in S
+		values[entry[A]] = append(values[entry[A]], entry)
 	}
-	return Entropy(S) - float64(len(Sv1)/len(S))*Entropy(Sv1) - float64(len(Sv2)/len(S))*Entropy(Sv2)
+
+	for value := range values {
+		Sv1 := values[value]
+		gain -= (float64(len(Sv1)) / float64(len(S))) * Entropy(Sv1)
+	}
+
+	return gain
 }
 
 func id3(entries []map[string]string, attributes []string) {
@@ -144,12 +154,12 @@ func main() {
 	var training []map[string]string
 	var testing []map[string]string
 
-	//fmt.Println(Entropy(append(training, testing...))) // ... is to append the slice
-
 	training, testing = readDataSet("data/tennis.txt")
-	fmt.Println(Entropy(append(training, testing...)))
-	fmt.Println("Training entropy: ", Entropy(training))
-	fmt.Println("Testing entropy: ", Entropy(testing))
+	fmt.Println("Total entropy:", Entropy(append(training, testing...)))
+	fmt.Println("Training entropy:", Entropy(training))
+	fmt.Println("Testing entropy:", Entropy(testing))
+
+	fmt.Println("Outlook Gain:", Gain(append(training, testing...), "outlook"))
 }
 
 //TODO: Sometimes training entropy is NaN because the RNG can set one array to totally empty.
