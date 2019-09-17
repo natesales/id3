@@ -105,7 +105,7 @@ func Entropy(entries []map[string]string) float64 {
 	 * entries: Array of maps containing all the entries
 	 * returns: float64, entropy value
 	 */
-
+	//TODO: Allow for more than one category.
 	var pYes float64
 	var pNo float64
 	for i, entry := range entries {
