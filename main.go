@@ -42,7 +42,7 @@ func readDataSet(filename string) ([]map[string]string, []map[string]string) {
 
 	file, err := os.Open(filename)
 	handle(err)
-	defer func() {
+	defer func() { // Deallocate
 		err := file.Close()
 		handle(err)
 	}()
@@ -92,7 +92,7 @@ func Entropy(entries []map[string]string) float64 {
 	var pYes float64
 	var pNo float64
 	for i, entry := range entries {
-		if entry["play tennis"] == "yes" {
+		if entry["play tennis"] == "yes" { //TODO Change to variable or first item in header.
 			pYes++
 		} else if entry["play tennis"] == "no" {
 			pNo++
@@ -106,7 +106,12 @@ func Entropy(entries []map[string]string) float64 {
 	total := pYes + pNo
 	pYes /= total
 	pNo /= total
-	return -(pYes * math.Log2(pYes)) - (pNo * math.Log2(pNo))
+
+	if pNo == 0 {
+		return -(pYes * math.Log2(pYes))
+	} else {
+		return -(pYes * math.Log2(pYes)) - (pNo * math.Log2(pNo))
+	}
 }
 
 func Gain(S []map[string]string, A string) float64 {
@@ -125,7 +130,7 @@ func Gain(S []map[string]string, A string) float64 {
 
 	for value := range values {
 		Sv1 := values[value]
-		gain -= (float64(len(Sv1)) / float64(len(S))) * Entropy(Sv1)
+		gain -= (float64(len(Sv1)) / float64(len(S))) * Entropy(Sv1) // Compute Entropy gain for given attribute
 	}
 
 	return gain
@@ -159,7 +164,12 @@ func main() {
 	fmt.Println("Training entropy:", Entropy(training))
 	fmt.Println("Testing entropy:", Entropy(testing))
 
+	fmt.Println()
+
 	fmt.Println("Outlook Gain:", Gain(append(training, testing...), "outlook"))
+	fmt.Println("Humidity Gain:", Gain(append(training, testing...), "humidity"))
+	fmt.Println("Wind Gain:", Gain(append(training, testing...), "wind"))
+	fmt.Println("Temperature Gain:", Gain(append(training, testing...), "temperature"))
 }
 
 //TODO: Sometimes training entropy is NaN because the RNG can set one array to totally empty.
