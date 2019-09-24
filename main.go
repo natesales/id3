@@ -1,5 +1,5 @@
 // Author: Nate Sales (@nwsnate) nate.cx
-// Revision: September 17, 2019
+// Revision: September 23, 2019
 
 package main
 
@@ -153,56 +153,175 @@ func Gain(S []map[string]string, A string) float64 {
 	return gain
 }
 
+// Begin id3 helpers
+
+func sameCategory(entries []map[string]string) bool {
+	/*
+	 * Description: Are all entries in the same category?
+	 */
+
+	lastCategory := ""
+
+	for _, entry := range entries { // Loop over entries
+		currentCategory := entry[categoryName]
+		if currentCategory != lastCategory { // If the category is not the same then return, they aren't in the same category.
+			return false
+		} else { // Otherwise keep going.
+			lastCategory = currentCategory
+		}
+	}
+
+	return true
+}
+
+func uniqueValuesOf(entries []map[string]string, attribute string) []string {
+	/*
+	 * Description: Return array of unique values of attribute.
+	 */
+
+	valueMap := make(map[string]bool) // This is the recommended way to make a set in Go.
+	unique := make([]string, 0, len(valueMap))
+
+	for _, entry := range entries {
+		valueMap[entry[attribute]] = true
+	}
+
+	for key := range valueMap {
+		unique = append(unique, key)
+	}
+
+	return unique
+}
+
+func attribWithLargestGain(entries []map[string]string, attributes []string) string {
+	var attribLargestGainSoFar = ""
+	var largestGain = 0.0
+
+	for _, attribute := range attributes { // Loop through the attributes
+		currentAttribGain := Gain(entries, attribute) // Compute the gain
+
+		if currentAttribGain > largestGain { // If the current gain is larger, then update the currently known values and continue
+			attribLargestGainSoFar = attribute
+			largestGain = currentAttribGain
+		}
+	}
+
+	return attribLargestGainSoFar
+}
+
+func mostCommon(entries []map[string]string, attribute string) (string, int) {
+
+	/*
+	 * Description: Compute the most common value of  in a given list of attributes.
+	 * Returns: string, attribute that is the most common and a certainty percent which is the percentage of that one out of all of them.
+	 */
+
+	valueMap := make(map[string]int) // map[attribute value]number of times
+
+	for _, entry := range entries {
+		valueMap[entry[attribute]]++
+	}
+
+	mostCommon := ""
+	valueMostCommon := 0
+
+	for value := range valueMap {
+		if valueMap[value] > valueMostCommon {
+			mostCommon = value
+			valueMostCommon = valueMap[value]
+		}
+	}
+
+	return mostCommon, len(valueMap) / valueMostCommon
+}
+
+// End id3 helpers
+
 func id3(entries []map[string]string, attributes []string) Node {
 
 	/* id3
 	 * Description: Main id3 recursive function.
+	 * entries: Array of entries.
+	 * attributes: String array of attributes. *** This includes the category! ***
+	 * Returns: Node
 	 */
 
-	var lastCategory string
-	for _, entry := range entries { // Check if they are all the same category (outcome)
-		currentCategory := entry[categoryName]
-		if currentCategory != lastCategory { // If the category is not the same, then there is more work to do.
-			/*
-				select the attribute that results in the greatest information gain
-					create (and eventually return) a non-leaf node that is labeled with that attribute
-					For each value v of that attribute:
-					create a child for that value by applying one of the following two options:
-					If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples
-					otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
-			*/
-		} else {
-			lastCategory = currentCategory // If its the same, then keep going.
+	// The ID3 function is given a list of examples and a list of possible attributes.
+	//    If all of the examples belong to the same category, then return a leaf node labeled with that category.
+	//    If there are no more attributes, return a leaf node labeled with the most common category in the examples. // TODO: What is the "most common category"
+	//    otherwise,
+	//        select the attribute that results in the greatest information gain
+	//        create (and eventually return) a non-leaf node that is labeled with that attribute
+	//        For each value v of that attribute:
+	//            create a child for that value by applying one of the following two options:
+	//                If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples
+	//                otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
+
+	if sameCategory(entries) { // If all of the examples belong to the same category, then return a leaf node labeled with that category.
+		return Node{ // Return a leaf Node, notated by the Children map being nil.
+			Name:     categoryName,
+			Children: nil,
 		}
 	}
 
-	// If nothing has been returned by now, then they are all in the same category. (Yes/No)
-	return Node{ // Return a leaf Node, notated by the Children map being nil.
-		Name:     categoryName,
-		Children: nil,
+	// By this point they are not all in the same category.
+
+	if len(attributes) == 0 { // If there are no attributes, return a leaf node labeled with the most common category in the examples.
+		categoryName, x := mostCommon(entries, attribute) // TODO: What is attribute?
+		return Node{
+			Name:     categoryName,
+			Children: nil, // This is a leaf.
+		}
 	}
-	/*
-		If all of the examples belong to the same category, then return a leaf node labeled with that category.
-		  If there are no more attributes, return a leaf node labeled with the most common category in the examples.
-	*/
+	//            create a child for that value by applying one of the following two options:
+	//                If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples // TODO: Write mostCommon function
+	//                otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
+
+	largestGain := attribWithLargestGain(entries, attributes) // select the attribute that results in the greatest information gain
+	node := Node{                                             // create (and eventually return) a non-leaf node that is labeled with that attribute
+		Name:     largestGain,
+		Children: map[string]Node{}, // An empty map
+	}
+
+	for _, v := range uniqueValuesOf(entries, largestGain) { // For each value v of that attribute,
+		// create a child for that value by applying one of the following two options:
+
+		if NoExamplesWithValueV { // If there are no examples with the value v,
+			categoryName, x := mostCommon(entries, attribute) // TODO: What is attribute?
+
+			node.Children["test"] = Node{ // Child is a leaf labeled with the most common category in the current examples
+				Name:     categoryName,
+				Children: nil,
+			}
+		} else {
+			// Otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
+			node.Children["something"] = id3(entries, attributes) // TODO: Make attributes the "remaining attributes"
+		}
+	}
+
+	return node
 }
 
 func main() {
+
 	var training []map[string]string
 	var testing []map[string]string
 
 	training, testing = readDataSet(filename)
 	fmt.Println("Total entropy:", Entropy(append(training, testing...)))
-	fmt.Println("Training entropy:", Entropy(training))
-	fmt.Println("Testing entropy:", Entropy(testing))
 
-	fmt.Println()
+	//fmt.Println("Training entropy:", Entropy(training))
+	//fmt.Println("Testing entropy:", Entropy(testing))
+	//
+	//fmt.Println()
+	//
+	//fmt.Println("Outlook Gain:", Gain(append(training, testing...), "outlook"))
+	//fmt.Println("Humidity Gain:", Gain(append(training, testing...), "humidity"))
+	//fmt.Println("Wind Gain:", Gain(append(training, testing...), "wind"))
+	//fmt.Println("Temperature Gain:", Gain(append(training, testing...), "temperature"))
 
-	fmt.Println("Outlook Gain:", Gain(append(training, testing...), "outlook"))
-	fmt.Println("Humidity Gain:", Gain(append(training, testing...), "humidity"))
-	fmt.Println("Wind Gain:", Gain(append(training, testing...), "wind"))
-	fmt.Println("Temperature Gain:", Gain(append(training, testing...), "temperature"))
-
-	//id3(append(training, testing...), []string{"outlook"})
-
+	fmt.Println(id3(append(training, testing...), []string{"outlook"}))
+	//mostCommon(training, "outlook")
 }
+
+//TODO: Remember that attributes ([]string) CONTAINS categoryName ("play tennis")
