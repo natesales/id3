@@ -30,8 +30,9 @@ type Node struct {
 	 * Children (map[string]Node) Keys: Value of attribute, Values: Child node
 	 */
 
-	Name     string
-	Children map[string]Node
+	Name        string
+	Description string
+	Children    map[string]Node
 }
 
 func handle(e error) {
@@ -45,12 +46,12 @@ func handle(e error) {
 	}
 }
 
-func readDataSet(filename string) ([]map[string]string, []map[string]string) {
+func readDataSet(filename string) ([]map[string]string, []map[string]string, []string) {
 
 	/* readDataSet
 	 * Description: Read data from text file randomly into slices of Entry objects.
 	 * filename: string Path to text file for reading
-	 * returns: 2 []map[string]string objects containing random values from filename
+	 * returns: 2 []map[string]string objects containing random values from filename and the header
 	 */
 
 	var training []map[string]string
@@ -95,7 +96,7 @@ func readDataSet(filename string) ([]map[string]string, []map[string]string) {
 		}
 	}
 
-	return training, testing
+	return training, testing, header
 }
 
 func Entropy(entries []map[string]string) float64 {
@@ -156,7 +157,6 @@ func Gain(S []map[string]string, A string) float64 {
 // Begin id3 helpers
 
 func sameCategory(entries []map[string]string) bool {
-
 	/*
 	 * Description: Are all entries in the same category?
 	 */
@@ -165,9 +165,12 @@ func sameCategory(entries []map[string]string) bool {
 
 	for _, entry := range entries { // Loop over entries
 		currentCategory := entry[categoryName]
-		if currentCategory != lastCategory { // If the category is not the same then return, they aren't in the same category.
-			return false
-		} else { // Otherwise keep going.
+
+		if lastCategory != "" {
+			if currentCategory != lastCategory { // If the category is not the same then return, they aren't all in the same category.
+				return false
+			}
+		} else {
 			lastCategory = currentCategory
 		}
 	}
@@ -177,7 +180,7 @@ func sameCategory(entries []map[string]string) bool {
 
 func uniqueValuesOf(entries []map[string]string, attribute string) []string {
 	/*
-	 * Description: Return array of unique values of attribute.
+	 * Description: Return array of unique values of attribute. (Essentially a set)
 	 */
 
 	valueMap := make(map[string]bool) // This is the recommended way to make a set in Go.
@@ -213,7 +216,7 @@ func attribWithLargestGain(entries []map[string]string, attributes []string) str
 func mostCommon(entries []map[string]string, attribute string) (string, int) {
 
 	/*
-	 * Description: Compute the most common value of  in a given list of attributes.
+	 * Description: Compute the most common value of attribute in a given list of attributes.
 	 * Returns: string, attribute that is the most common and a certainty percent which is the percentage of that one out of all of them.
 	 */
 
@@ -233,7 +236,50 @@ func mostCommon(entries []map[string]string, attribute string) (string, int) {
 		}
 	}
 
-	return mostCommon, len(valueMap) / valueMostCommon
+	return mostCommon, 0 // todo valueMostCommon / len(valueMap)
+}
+
+func ifIn(value string, slice []string) bool {
+	/*
+	 * Description: If value is in array
+	 */
+
+	for _, val := range slice {
+		if val == value {
+			return true
+		}
+	}
+	return false
+}
+
+func deleteFrom(slice []string, item string) []string {
+
+	/*
+	 * Description: Delete item from slice
+	 * Note: This is the recommended way to remove from a slice in Go. collection/list should have been used in this case.
+	 * https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
+	 */
+
+	indexOfItem := indexOf(item, slice)
+	if indexOfItem == -1 { // If item isn't in slice
+		return slice // Then there's nothing to do.
+	}
+
+	return append(slice[:indexOfItem], slice[indexOfItem+1:]...)
+}
+
+func indexOf(element string, slice []string) int {
+	/*
+	 * Description: Find first occurrence of element in array.
+	 * Returns: index (int)
+	 */
+	for index, item := range slice {
+		if item == element {
+			return index
+		}
+	}
+
+	return -1 // Then element isn't in array.
 }
 
 // End id3 helpers
@@ -267,15 +313,16 @@ func id3(entries []map[string]string, attributes []string) Node {
 
 	// By this point they are not all in the same category.
 
+	// For some reason len(attributes) goes down to 3 and stays there forever.
+
 	if len(attributes) == 0 { // If there are no attributes, return a leaf node labeled with the most common category in the examples.
-		categoryName, x := mostCommon(entries, attribute) // TODO: What is attribute?
+		mostCommon, _ := mostCommon(entries, categoryName)
 		return Node{
-			Name:     categoryName,
+			Name:     mostCommon,
 			Children: nil, // This is a leaf.
 		}
 	}
-	//            create a child for that value by applying one of the following two options:
-	//                If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples // TODO: Write mostCommon function
+	//                If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples
 	//                otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
 
 	largestGain := attribWithLargestGain(entries, attributes) // select the attribute that results in the greatest information gain
@@ -284,32 +331,72 @@ func id3(entries []map[string]string, attributes []string) Node {
 		Children: map[string]Node{}, // An empty map
 	}
 
+	//	   If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples
+	//	   otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
+
 	for _, v := range uniqueValuesOf(entries, largestGain) { // For each value v of that attribute,
 		// create a child for that value by applying one of the following two options:
 
-		if NoExamplesWithValueV { // If there are no examples with the value v,
-			categoryName, x := mostCommon(entries, attribute) // TODO: What is attribute?
+		var subset []map[string]string // subset of examples that are share a given property (wind=weak)
 
-			node.Children["test"] = Node{ // Child is a leaf labeled with the most common category in the current examples
-				Name:     categoryName,
-				Children: nil,
+		for _, e := range entries { // Fill up the subset of entries that have v as their value of largestGain
+			if e[largestGain] == v {
+				subset = append(subset, e)
 			}
-		} else {
+		}
+
+		if len(subset) == 0 { // If there are no examples with the value v,
+			mostCommon, _ := mostCommon(entries, categoryName)
+
+			node.Children[v] = Node{ // Child is a leaf labeled with the most common category in the current examples
+				Name:        mostCommon,
+				Description: "I give up",
+				Children:    nil,
+			}
+		} else { // There is a subset...
 			// Otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
-			node.Children["something"] = id3(entries, attributes) // TODO: Make attributes the "remaining attributes"
+
+			node.Children[v] = id3(subset, deleteFrom(attributes, largestGain)) // delete largestGain from attributes
 		}
 	}
 
 	return node
 }
 
-func main() {
+func printTree(root Node, indentation int) {
 
+	/*
+	 * Description: Print out the tree
+	 */
+
+	fmt.Println(root)
+	fmt.Println("\t")
+
+	for _, child := range root.Children {
+		newIndentation := indentation + 1
+		printTree(child, newIndentation)
+	}
+}
+
+func deleteCategoryFromEntries(entries []map[string]string) {
+	/*
+	 * Description: Delete categoryName from entries
+	 */
+
+	for _, entry := range entries {
+		delete(entry, categoryName)
+	}
+}
+
+func main() {
 	var training []map[string]string
 	var testing []map[string]string
+	var header []string
 
-	training, testing = readDataSet(filename)
-	fmt.Println("Total entropy:", Entropy(append(training, testing...)))
+	training, testing, header = readDataSet(filename)
+
+	all := append(training, testing...)
+	//fmt.Println("Total entropy:", Entropy(append(training, testing...)))
 
 	//fmt.Println("Training entropy:", Entropy(training))
 	//fmt.Println("Testing entropy:", Entropy(testing))
@@ -321,8 +408,19 @@ func main() {
 	//fmt.Println("Wind Gain:", Gain(append(training, testing...), "wind"))
 	//fmt.Println("Temperature Gain:", Gain(append(training, testing...), "temperature"))
 
-	fmt.Println(id3(append(training, testing...), []string{"outlook"}))
-	//mostCommon(training, "outlook")
+	deleteCategoryFromEntries(all)
+	printTree(id3(all, header), 0) // Start it out with no indentation
+
 }
 
-//TODO: Remember that attributes ([]string) CONTAINS categoryName ("play tennis")
+//func findAttributes(entries []map[string]string) []string { // Why is this here
+//	var attributes []string
+//
+//	for _, entry := range entries {
+//		attributes = append(attributes, entry[])
+//	}
+//
+//	return attributes
+//}
+
+// TODO: Remember that attributes ([]string) CONTAINS categoryName ("play tennis")
