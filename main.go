@@ -156,6 +156,7 @@ func Gain(S []map[string]string, A string) float64 {
 // Begin id3 helpers
 
 func sameCategory(entries []map[string]string) bool {
+
 	/*
 	 * Description: Are all entries in the same category?
 	 */
