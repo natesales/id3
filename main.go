@@ -1,5 +1,4 @@
-// Author: Nate Sales (@nwsnate) nate.cx
-// Revision: September 23, 2019
+// Author: Nate Sales (@nwsnate)
 
 package main
 
@@ -93,6 +92,9 @@ func readDataSet(filename string) ([]map[string]string, []map[string]string, []s
 			} else {
 				testing = append(testing, newEntry)
 			}
+			// with training and testing being empty,
+			// training = all[:len(all)/2]
+			// testing = all[len(all)/2:]
 		}
 	}
 
@@ -125,6 +127,9 @@ func Entropy(entries []map[string]string) float64 {
 	pYes /= total
 	pNo /= total
 
+	if pYes == 0 {
+		return -(pNo * math.Log2(pNo))
+	}
 	if pNo == 0 {
 		return -(pYes * math.Log2(pYes))
 	} else {
@@ -166,10 +171,8 @@ func sameCategory(entries []map[string]string) bool {
 	for _, entry := range entries { // Loop over entries
 		currentCategory := entry[categoryName]
 
-		if lastCategory != "" {
-			if currentCategory != lastCategory { // If the category is not the same then return, they aren't all in the same category.
-				return false
-			}
+		if (lastCategory != "") && (currentCategory != lastCategory) { // If the category is not the same then return, they aren't all in the same category.
+			return false
 		} else {
 			lastCategory = currentCategory
 		}
@@ -204,7 +207,7 @@ func attribWithLargestGain(entries []map[string]string, attributes []string) str
 	for _, attribute := range attributes { // Loop through the attributes
 		currentAttribGain := Gain(entries, attribute) // Compute the gain
 
-		if currentAttribGain > largestGain { // If the current gain is larger, then update the currently known values and continue
+		if currentAttribGain >= largestGain { // If the current gain is larger, then update the currently known values and continue
 			attribLargestGainSoFar = attribute
 			largestGain = currentAttribGain
 		}
@@ -261,11 +264,13 @@ func deleteFrom(slice []string, item string) []string {
 	 */
 
 	indexOfItem := indexOf(item, slice)
-	if indexOfItem == -1 { // If item isn't in slice
-		return slice // Then there's nothing to do.
-	}
+	if indexOfItem != -1 { // If item is in slice
+		//return append(slice[:indexOfItem], slice[indexOfItem+1:]...)
+		return append(slice[:indexOfItem], slice[indexOfItem+1:]...)
+		//slice = append(slice[:0], slice[1:]...)
+	} // If item is not in slice, then there's nothing to do.
 
-	return append(slice[:indexOfItem], slice[indexOfItem+1:]...)
+	return slice // If it comes to this point, then item isnt in slice. So return.
 }
 
 func indexOf(element string, slice []string) int {
@@ -289,13 +294,13 @@ func id3(entries []map[string]string, attributes []string) Node {
 	/* id3
 	 * Description: Main id3 recursive function.
 	 * entries: Array of entries.
-	 * attributes: String array of attributes. *** This includes the category! ***
+	 * attributes: String array of attributes.
 	 * Returns: Node
 	 */
 
 	// The ID3 function is given a list of examples and a list of possible attributes.
 	//    If all of the examples belong to the same category, then return a leaf node labeled with that category.
-	//    If there are no more attributes, return a leaf node labeled with the most common category in the examples. // TODO: What is the "most common category"
+	//    If there are no more attributes, return a leaf node labeled with the most common category in the examples.
 	//    otherwise,
 	//        select the attribute that results in the greatest information gain
 	//        create (and eventually return) a non-leaf node that is labeled with that attribute
@@ -303,7 +308,6 @@ func id3(entries []map[string]string, attributes []string) Node {
 	//            create a child for that value by applying one of the following two options:
 	//                If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples
 	//                otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
-
 	if sameCategory(entries) { // If all of the examples belong to the same category, then return a leaf node labeled with that category.
 		return Node{ // Return a leaf Node, notated by the Children map being nil.
 			Name:     categoryName,
@@ -315,6 +319,7 @@ func id3(entries []map[string]string, attributes []string) Node {
 
 	// For some reason len(attributes) goes down to 3 and stays there forever.
 
+	//fmt.Println(attributes)
 	if len(attributes) == 0 { // If there are no attributes, return a leaf node labeled with the most common category in the examples.
 		mostCommon, _ := mostCommon(entries, categoryName)
 		return Node{
@@ -353,9 +358,9 @@ func id3(entries []map[string]string, attributes []string) Node {
 				Description: "I give up",
 				Children:    nil,
 			}
+
 		} else { // There is a subset...
 			// Otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
-
 			node.Children[v] = id3(subset, deleteFrom(attributes, largestGain)) // delete largestGain from attributes
 		}
 	}
@@ -368,9 +373,11 @@ func printTree(root Node, indentation int) {
 	/*
 	 * Description: Print out the tree
 	 */
+	for i := 0; i < indentation; i++ {
+		fmt.Print("\t")
+	}
 
-	fmt.Println(root)
-	fmt.Println("\t")
+	fmt.Println(root.Name, root.Description)
 
 	for _, child := range root.Children {
 		newIndentation := indentation + 1
@@ -378,39 +385,27 @@ func printTree(root Node, indentation int) {
 	}
 }
 
-func deleteCategoryFromEntries(entries []map[string]string) {
-	/*
-	 * Description: Delete categoryName from entries
-	 */
-
-	for _, entry := range entries {
-		delete(entry, categoryName)
-	}
-}
-
 func main() {
 	var training []map[string]string
 	var testing []map[string]string
 	var header []string
-
+	//
 	training, testing, header = readDataSet(filename)
+	//_, _, header = readDataSet(filename)
 
 	all := append(training, testing...)
 	//fmt.Println("Total entropy:", Entropy(append(training, testing...)))
-
+	//
 	//fmt.Println("Training entropy:", Entropy(training))
 	//fmt.Println("Testing entropy:", Entropy(testing))
-	//
-	//fmt.Println()
 	//
 	//fmt.Println("Outlook Gain:", Gain(append(training, testing...), "outlook"))
 	//fmt.Println("Humidity Gain:", Gain(append(training, testing...), "humidity"))
 	//fmt.Println("Wind Gain:", Gain(append(training, testing...), "wind"))
 	//fmt.Println("Temperature Gain:", Gain(append(training, testing...), "temperature"))
 
-	deleteCategoryFromEntries(all)
-	printTree(id3(all, header), 0) // Start it out with no indentation
-
+	header = deleteFrom(header, categoryName)
+	printTree(id3(all, header), 0)
 }
 
 //func findAttributes(entries []map[string]string) []string { // Why is this here
