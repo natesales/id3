@@ -118,6 +118,7 @@ func Entropy(entries []map[string]string) float64 {
 			pNo++
 		} else {
 			fmt.Println(entry)
+			fmt.Println(entry)
 			fmt.Println(categoryName + " is neither yes or no. It's '" + entry[categoryName] + "' with index " + strconv.Itoa(i))
 			os.Exit(1)
 		}
@@ -242,19 +243,6 @@ func mostCommon(entries []map[string]string, attribute string) (string, int) {
 	return mostCommon, 0 // todo valueMostCommon / len(valueMap)
 }
 
-func ifIn(value string, slice []string) bool {
-	/*
-	 * Description: If value is in array
-	 */
-
-	for _, val := range slice {
-		if val == value {
-			return true
-		}
-	}
-	return false
-}
-
 func deleteFrom(slice []string, item string) []string {
 
 	/*
@@ -327,8 +315,9 @@ func id3(entries []map[string]string, attributes []string) Node {
 			Children: nil, // This is a leaf.
 		}
 	}
-	//                If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples
-	//                otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
+
+	// If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples
+	// otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
 
 	largestGain := attribWithLargestGain(entries, attributes) // select the attribute that results in the greatest information gain
 	node := Node{                                             // create (and eventually return) a non-leaf node that is labeled with that attribute
@@ -336,8 +325,8 @@ func id3(entries []map[string]string, attributes []string) Node {
 		Children: map[string]Node{}, // An empty map
 	}
 
-	//	   If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples
-	//	   otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
+	// If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples
+	// otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
 
 	for _, v := range uniqueValuesOf(entries, largestGain) { // For each value v of that attribute,
 		// create a child for that value by applying one of the following two options:
@@ -352,7 +341,6 @@ func id3(entries []map[string]string, attributes []string) Node {
 
 		if len(subset) == 0 { // If there are no examples with the value v,
 			mostCommon, _ := mostCommon(entries, categoryName)
-
 			node.Children[v] = Node{ // Child is a leaf labeled with the most common category in the current examples
 				Name:        mostCommon,
 				Description: "I give up",
@@ -389,7 +377,7 @@ func main() {
 	var training []map[string]string
 	var testing []map[string]string
 	var header []string
-	//
+
 	training, testing, header = readDataSet(filename)
 	//_, _, header = readDataSet(filename)
 
@@ -405,7 +393,8 @@ func main() {
 	//fmt.Println("Temperature Gain:", Gain(append(training, testing...), "temperature"))
 
 	header = deleteFrom(header, categoryName)
-	printTree(id3(all, header), 0)
+	//printTree(
+	id3(all, header) //, 0)
 }
 
 //func findAttributes(entries []map[string]string) []string { // Why is this here
@@ -417,5 +406,3 @@ func main() {
 //
 //	return attributes
 //}
-
-// TODO: Remember that attributes ([]string) CONTAINS categoryName ("play tennis")
