@@ -162,24 +162,25 @@ func Gain(S []map[string]string, A string) float64 {
 
 // Begin id3 helpers
 
-func sameCategory(entries []map[string]string) bool {
+func sameCategory(entries []map[string]string) (bool, string) {
 	/*
 	 * Description: Are all entries in the same category?
 	 */
 
 	lastCategory := ""
+	var currentCategory string
 
 	for _, entry := range entries { // Loop over entries
-		currentCategory := entry[categoryName]
+		currentCategory = entry[categoryName]
 
 		if (lastCategory != "") && (currentCategory != lastCategory) { // If the category is not the same then return, they aren't all in the same category.
-			return false
+			return false, "" // If they're not in the same category, return an empty string
 		} else {
 			lastCategory = currentCategory
 		}
 	}
 
-	return true
+	return true, currentCategory
 }
 
 func uniqueValuesOf(entries []map[string]string, attribute string) []string {
@@ -296,9 +297,10 @@ func id3(entries []map[string]string, attributes []string) Node {
 	//            create a child for that value by applying one of the following two options:
 	//                If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples
 	//                otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
-	if sameCategory(entries) { // If all of the examples belong to the same category, then return a leaf node labeled with that category.
+	samecategory, group := sameCategory(entries)
+	if samecategory { // If all of the examples belong to the same category, then return a leaf node labeled with that category.
 		return Node{ // Return a leaf Node, notated by the Children map being nil.
-			Name:     categoryName,
+			Name:     categoryName + " " + group,
 			Children: nil,
 		}
 	}
@@ -356,20 +358,28 @@ func id3(entries []map[string]string, attributes []string) Node {
 	return node
 }
 
+func indent(indentation int) string {
+	out := ""
+	for i := 0; i < indentation; i++ {
+		out += "\t"
+	}
+	return out
+}
+
 func printTree(root Node, indentation int) {
 
 	/*
 	 * Description: Print out the tree
 	 */
-	for i := 0; i < indentation; i++ {
-		fmt.Print("\t")
+	if root.Children == nil { // If leaf
+		fmt.Println(indent(indentation), root.Name, root.Description)
+	} else {
+		fmt.Println(indent(indentation), "What is the", root.Name+"?", root.Description)
 	}
 
-	fmt.Println(root.Name, root.Description)
-
-	for _, child := range root.Children {
-		newIndentation := indentation + 1
-		printTree(child, newIndentation)
+	for index, child := range root.Children {
+		fmt.Println(indent(indentation+1), index)
+		printTree(child, indentation+2)
 	}
 }
 
@@ -393,8 +403,7 @@ func main() {
 	//fmt.Println("Temperature Gain:", Gain(append(training, testing...), "temperature"))
 
 	header = deleteFrom(header, categoryName)
-	//printTree(
-	id3(all, header) //, 0)
+	printTree(id3(all, header), 0)
 }
 
 //func findAttributes(entries []map[string]string) []string { // Why is this here
