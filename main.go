@@ -8,17 +8,13 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/rand"
 	"os"
-	"strconv"
 	"strings"
-	"time"
 )
 
-const ( // Global constants
-	categoryName = "play tennis"
-	outcomeTrue  = "yes"
-	outcomeFalse = "no" // TODO: There could be more than 2 outcomes. Take this from the outcome column
+var ( // Globals
+	categoryName string
+	categories   = make(map[string]int) // Category name and number of times it shows up.
 
 	filename = "data/tennis.txt"
 )
@@ -55,8 +51,7 @@ func readDataSet(filename string) ([]map[string]string, []map[string]string, []s
 
 	var training []map[string]string
 	var testing []map[string]string
-
-	r := rand.New(rand.NewSource(time.Now().Unix())) // Not a good seed.
+	var all []map[string]string
 
 	file, err := os.Open(filename)
 	handle(err)
@@ -76,8 +71,11 @@ func readDataSet(filename string) ([]map[string]string, []map[string]string, []s
 		}
 		handle(err)
 
+		categories[entry[0]] += 1
+
 		if len(header) == 0 { // Skip the first line since it contains the header.
 			header = entry
+			categoryName = header[0]
 		} else {
 			newEntry := make(map[string]string)
 
@@ -86,15 +84,12 @@ func readDataSet(filename string) ([]map[string]string, []map[string]string, []s
 				newEntry[item] = entry[i] // Fill up the map
 			}
 
-			// TODO Sometimes training entropy is NaN because the RNG can set one array to totally empty.
-			if r.Intn(2) == 1 { // Split it up in roughly half.
-				training = append(training, newEntry)
-			} else {
-				testing = append(testing, newEntry)
-			}
-			// with training and testing being empty,
-			// training = all[:len(all)/2]
-			// testing = all[len(all)/2:]
+			all = append(all, newEntry)
+
+			// TODO: Shuffle up the items in all
+
+			training = all[:len(all)/2]
+			testing = all[len(all)/2:]
 		}
 	}
 
@@ -108,34 +103,23 @@ func Entropy(entries []map[string]string) float64 {
 	 * entries: Array of maps containing all the entries
 	 * returns: float64, entropy value
 	 */
-	//TODO: Allow for more than one category.
-	var pYes float64
-	var pNo float64
-	for i, entry := range entries {
-		if entry[categoryName] == outcomeTrue {
-			pYes++
-		} else if entry[categoryName] == outcomeFalse {
-			pNo++
-		} else {
-			fmt.Println(entry)
-			fmt.Println(entry)
-			fmt.Println(categoryName + " is neither yes or no. It's '" + entry[categoryName] + "' with index " + strconv.Itoa(i))
-			os.Exit(1)
-		}
+
+	entryValues := make(map[string]int)
+
+	for _, entry := range entries {
+		entryValues[entry[categoryName]] += 1
 	}
 
-	total := pYes + pNo
-	pYes /= total
-	pNo /= total
+	final := 0.0
 
-	if pYes == 0 {
-		return -(pNo * math.Log2(pNo))
+	total := float64(len(entries))
+
+	for _, val := range entryValues {
+		percentage := float64(val) / total
+		final += -(percentage * math.Log2(percentage))
 	}
-	if pNo == 0 {
-		return -(pYes * math.Log2(pYes))
-	} else {
-		return -(pYes * math.Log2(pYes)) - (pNo * math.Log2(pNo))
-	}
+
+	return final
 }
 
 func Gain(S []map[string]string, A string) float64 {
@@ -309,7 +293,6 @@ func id3(entries []map[string]string, attributes []string) Node {
 
 	// For some reason len(attributes) goes down to 3 and stays there forever.
 
-	//fmt.Println(attributes)
 	if len(attributes) == 0 { // If there are no attributes, return a leaf node labeled with the most common category in the examples.
 		mostCommon, _ := mostCommon(entries, categoryName)
 		return Node{
@@ -324,7 +307,7 @@ func id3(entries []map[string]string, attributes []string) Node {
 	largestGain := attribWithLargestGain(entries, attributes) // select the attribute that results in the greatest information gain
 	node := Node{                                             // create (and eventually return) a non-leaf node that is labeled with that attribute
 		Name:     largestGain,
-		Children: map[string]Node{}, // An empty map
+		Children: make(map[string]Node), // An empty map
 	}
 
 	// If there are no examples with the value v, then the child is a leaf labeled with the most common category in the current examples
@@ -359,6 +342,11 @@ func id3(entries []map[string]string, attributes []string) Node {
 }
 
 func indent(indentation int) string {
+
+	/*
+	 * Return `indentation` number of tabs.
+	 */
+
 	out := ""
 	for i := 0; i < indentation; i++ {
 		out += "\t"
@@ -389,18 +377,19 @@ func main() {
 	var header []string
 
 	training, testing, header = readDataSet(filename)
-	//_, _, header = readDataSet(filename)
+	readDataSet(filename)
 
 	all := append(training, testing...)
-	//fmt.Println("Total entropy:", Entropy(append(training, testing...)))
-	//
-	//fmt.Println("Training entropy:", Entropy(training))
-	//fmt.Println("Testing entropy:", Entropy(testing))
-	//
-	//fmt.Println("Outlook Gain:", Gain(append(training, testing...), "outlook"))
-	//fmt.Println("Humidity Gain:", Gain(append(training, testing...), "humidity"))
-	//fmt.Println("Wind Gain:", Gain(append(training, testing...), "wind"))
-	//fmt.Println("Temperature Gain:", Gain(append(training, testing...), "temperature"))
+
+	fmt.Println("Total entropy:", Entropy(all))
+
+	fmt.Println("Training entropy:", Entropy(training))
+	fmt.Println("Testing entropy:", Entropy(testing))
+
+	fmt.Println("Outlook Gain:", Gain(all, "outlook"))
+	fmt.Println("Humidity Gain:", Gain(all, "humidity"))
+	fmt.Println("Wind Gain:", Gain(all, "wind"))
+	fmt.Println("Temperature Gain:", Gain(all, "temperature"))
 
 	header = deleteFrom(header, categoryName)
 	printTree(id3(all, header), 0)
