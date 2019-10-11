@@ -7,3 +7,12 @@ Run `make` to compile and run.
 
 All code changes should be checked by Github Actions and builds are available [here](https://github.com/nwsnate/id3/actions).
 Actions is in beta, and isn't working properly all the time.
+
+
+
+| Dataset | Training Percentage | Accuracy |
+| ------- | ------------------- | -------- |
+| tennis.txt   |                     |          |
+| tumor.txt    |                     |          |
+| mushroom.txt      |                     |          |
+

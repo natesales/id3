@@ -7,16 +7,17 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log"
 	"math"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 )
 
 var ( // Globals
 	categoryName string
 	categories   = make(map[string]int) // Category name and number of times it shows up.
-
-	filename = "data/tennis.txt"
 )
 
 type Node struct {
@@ -86,7 +87,8 @@ func readDataSet(filename string) ([]map[string]string, []map[string]string, []s
 
 			all = append(all, newEntry)
 
-			// TODO: Shuffle up the items in all
+			rand.Seed(time.Now().UnixNano())
+			rand.Shuffle(len(all), func(i, j int) { all[i], all[j] = all[j], all[i] })
 
 			training = all[:len(all)/2]
 			testing = all[len(all)/2:]
@@ -284,7 +286,7 @@ func id3(entries []map[string]string, attributes []string) Node {
 	samecategory, group := sameCategory(entries)
 	if samecategory { // If all of the examples belong to the same category, then return a leaf node labeled with that category.
 		return Node{ // Return a leaf Node, notated by the Children map being nil.
-			Name:     categoryName + " " + group,
+			Name:     categoryName + "=" + group,
 			Children: nil,
 		}
 	}
@@ -371,28 +373,66 @@ func printTree(root Node, indentation int) {
 	}
 }
 
+func follow(entry map[string]string, root Node) string {
+
+	/* follow
+	 * Description: Follow the tree
+	 */
+
+	if root.Children != nil { // If not leaf
+		return follow(entry, root.Children[entry[root.Name]])
+	} else { // If the base case is reached	return ""
+		return root.Name
+	}
+}
+
 func main() {
 	var training []map[string]string
 	var testing []map[string]string
 	var header []string
 
+	filename := "data/mushrooms.txt"
+
+	log.Print("Reading dataset", filename)
+
+	start := time.Now()
 	training, testing, header = readDataSet(filename)
-	readDataSet(filename)
-
 	all := append(training, testing...)
+	log.Print("Finished in ", time.Since(start))
 
-	fmt.Println("Total entropy:", Entropy(all))
+	log.Println(len(all), "entries detected.")
 
-	fmt.Println("Training entropy:", Entropy(training))
-	fmt.Println("Testing entropy:", Entropy(testing))
-
-	fmt.Println("Outlook Gain:", Gain(all, "outlook"))
-	fmt.Println("Humidity Gain:", Gain(all, "humidity"))
-	fmt.Println("Wind Gain:", Gain(all, "wind"))
-	fmt.Println("Temperature Gain:", Gain(all, "temperature"))
+	//fmt.Println("Total entropy:", Entropy(all))
+	//
+	//fmt.Println("Training entropy:", Entropy(training))
+	//fmt.Println("Testing entropy:", Entropy(testing))
+	//
+	//fmt.Println("Outlook Gain:", Gain(all, "outlook"))
+	//fmt.Println("Humidity Gain:", Gain(all, "humidity"))
+	//fmt.Println("Wind Gain:", Gain(all, "wind"))
+	//fmt.Println("Temperature Gain:", Gain(all, "temperature"))
 
 	header = deleteFrom(header, categoryName)
-	printTree(id3(all, header), 0)
+
+	log.Println("Building tree")
+
+	start = time.Now()
+	tree := id3(training, header)
+	log.Println("Tree building finished in", time.Since(start))
+
+	//printTree(tree, 0)
+
+	correct := 0
+	incorrect := 0
+	for _, entry := range testing {
+		if strings.Split(follow(entry, tree), "=")[1] == entry[categoryName] {
+			correct++
+		} else {
+			incorrect++
+		}
+	}
+
+	log.Println(float64(correct)/float64(correct+incorrect)*100, "% Accuracy")
 }
 
 //func findAttributes(entries []map[string]string) []string { // Why is this here
