@@ -42,7 +42,7 @@ func handle(e error) {
 	}
 }
 
-func readDataSet(filename string) ([]map[string]string, []map[string]string, []string) {
+func readDataSet(filename string, trainingPercent float64) ([]map[string]string, []map[string]string, []string) {
 
 	/* readDataSet
 	 * Description: Read data from text file randomly into slices of Entry objects.
@@ -67,12 +67,13 @@ func readDataSet(filename string) ([]map[string]string, []map[string]string, []s
 	for scanner.Scan() {
 		reader := csv.NewReader(strings.NewReader(scanner.Text()))
 		entry, err := reader.Read() // Read in one line
+
 		if err == io.EOF {
 			break
 		}
 		handle(err)
 
-		categories[entry[0]] += 1
+		categories[entry[0]] = 1
 
 		if len(header) == 0 { // Skip the first line since it contains the header.
 			header = entry
@@ -86,14 +87,16 @@ func readDataSet(filename string) ([]map[string]string, []map[string]string, []s
 			}
 
 			all = append(all, newEntry)
-
-			rand.Seed(time.Now().UnixNano())
-			rand.Shuffle(len(all), func(i, j int) { all[i], all[j] = all[j], all[i] })
-
-			training = all[:len(all)/2]
-			testing = all[len(all)/2:]
 		}
 	}
+
+	rand.Seed(time.Now().UnixNano()) // 9698770
+	rand.Shuffle(len(all), func(i, j int) { all[i], all[j] = all[j], all[i] })
+
+	splitPoint := int(trainingPercent * float64(len(all)))
+
+	training = all[:splitPoint]
+	testing = all[splitPoint:]
 
 	return training, testing, header
 }
@@ -240,12 +243,13 @@ func deleteFrom(slice []string, item string) []string {
 
 	indexOfItem := indexOf(item, slice)
 	if indexOfItem != -1 { // If item is in slice
-		//return append(slice[:indexOfItem], slice[indexOfItem+1:]...)
-		return append(slice[:indexOfItem], slice[indexOfItem+1:]...)
-		//slice = append(slice[:0], slice[1:]...)
+		sliceCopy := make([]string, len(slice))
+		copy(sliceCopy, slice)
+
+		return append(sliceCopy[:indexOfItem], sliceCopy[indexOfItem+1:]...)
 	} // If item is not in slice, then there's nothing to do.
 
-	return slice // If it comes to this point, then item isnt in slice. So return.
+	return slice // If it comes to this point, then item isn't in slice. So return.
 }
 
 func indexOf(element string, slice []string) int {
@@ -286,8 +290,9 @@ func id3(entries []map[string]string, attributes []string) Node {
 	samecategory, group := sameCategory(entries)
 	if samecategory { // If all of the examples belong to the same category, then return a leaf node labeled with that category.
 		return Node{ // Return a leaf Node, notated by the Children map being nil.
-			Name:     categoryName + "=" + group,
-			Children: nil,
+			Name:        group,
+			Description: categoryName + "=" + group,
+			Children:    nil,
 		}
 	}
 
@@ -330,13 +335,20 @@ func id3(entries []map[string]string, attributes []string) Node {
 			mostCommon, _ := mostCommon(entries, categoryName)
 			node.Children[v] = Node{ // Child is a leaf labeled with the most common category in the current examples
 				Name:        mostCommon,
-				Description: "I give up",
+				Description: "I give up but it might be: " + mostCommon,
 				Children:    nil,
 			}
 
 		} else { // There is a subset...
 			// Otherwise, the child is the result of running ID3 recursively with the examples that have value v and all the remaining attributes
-			node.Children[v] = id3(subset, deleteFrom(attributes, largestGain)) // delete largestGain from attributes
+			newAttributes := deleteFrom(attributes, largestGain)
+			//if largestGain == "abdominal" {
+			//	fmt.Println("Attributes:     ", attributes)
+			//	fmt.Println("New Attributes: ", newAttributes)
+			//}
+
+			print()
+			node.Children[v] = id3(subset, newAttributes) // delete largestGain from attributes
 		}
 	}
 
@@ -362,7 +374,7 @@ func printTree(root Node, indentation int) {
 	 * Description: Print out the tree
 	 */
 	if root.Children == nil { // If leaf
-		fmt.Println(indent(indentation), root.Name, root.Description)
+		fmt.Println(indent(indentation), root.Description)
 	} else {
 		fmt.Println(indent(indentation), "What is the", root.Name+"?", root.Description)
 	}
@@ -377,6 +389,7 @@ func follow(entry map[string]string, root Node) string {
 
 	/* follow
 	 * Description: Follow the tree
+	 * Returns: string, name of node
 	 */
 
 	if root.Children != nil { // If not leaf
@@ -386,21 +399,22 @@ func follow(entry map[string]string, root Node) string {
 	}
 }
 
-func main() {
+func run() {
 	var training []map[string]string
 	var testing []map[string]string
 	var header []string
 
-	filename := "data/mushrooms.txt"
-
-	log.Print("Reading dataset", filename)
+	filename := "data/tumor.txt"
 
 	start := time.Now()
-	training, testing, header = readDataSet(filename)
+	training, testing, header = readDataSet(filename, 0.25)
 	all := append(training, testing...)
-	log.Print("Finished in ", time.Since(start))
+	fmt.Println("Finished in ", time.Since(start))
 
 	log.Println(len(all), "entries detected.")
+
+	//fmt.Println(categoryName)
+	//os.Exit(1)
 
 	//fmt.Println("Total entropy:", Entropy(all))
 	//
@@ -414,25 +428,39 @@ func main() {
 
 	header = deleteFrom(header, categoryName)
 
+	//training = all
+	//testing = all
+
 	log.Println("Building tree")
+
+	log.Println("Training Length:", len(training))
+	log.Println("Testing Length:", len(testing))
 
 	start = time.Now()
 	tree := id3(training, header)
-	log.Println("Tree building finished in", time.Since(start))
+	//log.Println("Tree building finished in", time.Since(start))
 
+	//start = time.Now()
+	//log.Println("Printing Tree")
 	//printTree(tree, 0)
+	//log.Println("Tree printing finished in", time.Since(start))
 
 	correct := 0
 	incorrect := 0
 	for _, entry := range testing {
-		if strings.Split(follow(entry, tree), "=")[1] == entry[categoryName] {
+		predictedOutcome := follow(entry, tree)
+		realOutcome := entry[categoryName]
+
+		if predictedOutcome == realOutcome {
 			correct++
 		} else {
 			incorrect++
 		}
 	}
 
-	log.Println(float64(correct)/float64(correct+incorrect)*100, "% Accuracy")
+	log.Println(float64(correct)/float64(correct+incorrect)*100.0, "% Accuracy")
+
+	log.Println("ID3 Done.\n")
 }
 
 //func findAttributes(entries []map[string]string) []string { // Why is this here
@@ -444,3 +472,9 @@ func main() {
 //
 //	return attributes
 //}
+
+func main() {
+	for i := 1; i < 2; i++ {
+		run()
+	}
+}

@@ -7,4 +7,3 @@ build:
 clean:
 	go clean
 	go fmt
-
