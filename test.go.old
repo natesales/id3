@@ -1,0 +1,64 @@
+package main
+
+import "fmt"
+
+func deleteFrom(slice []string, item string) []string {
+
+	/*
+	 * Description: Delete item from slice
+	 * Note: This is the recommended way to remove from a slice in Go. collection/list should have been used in this case.
+	 * https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
+	 */
+
+	indexOfItem := indexOf(item, slice)
+	if indexOfItem != -1 { // If item is in slice
+		//return append(slice[:indexOfItem], slice[indexOfItem+1:]...)
+		return append(slice[:indexOfItem], slice[indexOfItem+1:]...)
+		//slice = append(slice[:0], slice[1:]...)
+	} // If item is not in slice, then there's nothing to do.
+
+	return slice // If it comes to this point, then item isnt in slice. So return.
+}
+
+func indexOf(element string, slice []string) int {
+	/*
+	 * Description: Find first occurrence of element in array.
+	 * Returns: index (int)
+	 */
+	for index, item := range slice {
+		if item == element {
+			return index
+		}
+	}
+
+	return -1 // Then element isn't in array.
+}
+
+func deleteFrom2(slice []string, item string) []string {
+
+	/*
+	 * Description: Delete item from slice
+	 * Note: This is the recommended way to remove from a slice in Go. collection/list should have been used in this case.
+	 * https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
+	 */
+
+	indexOfItem := indexOf(item, slice)
+	if indexOfItem != -1 { // If item is in slice
+		sliceCopy := make([]string, len(slice))
+		copy(sliceCopy, slice)
+
+		return append(sliceCopy[:indexOfItem], sliceCopy[indexOfItem+1:]...)
+	} // If item is not in slice, then there's nothing to do.
+
+	return slice // If it comes to this point, then item isnt in slice. So return.
+}
+
+func main() {
+	var m = []string{"cat", "dog", "rabbit"}
+	m = deleteFrom(m, "rabb" + "it")
+	fmt.Println(m)
+
+	var x = []string{"cat", "dog", "rabbit"}
+    x = deleteFrom2(m, "rabb" + "it")
+    fmt.Println(x)
+}

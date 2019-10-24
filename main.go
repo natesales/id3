@@ -399,28 +399,21 @@ func follow(entry map[string]string, root Node) string {
 	}
 }
 
-func run() {
+func run(filename string, trainingPercent float64) float64 {
+	// Returns accuracy
 	var training []map[string]string
 	var testing []map[string]string
 	var header []string
 
-	filename := "data/tumor.txt"
 
-	start := time.Now()
-	training, testing, header = readDataSet(filename, 0.25)
-	all := append(training, testing...)
-	fmt.Println("Finished in ", time.Since(start))
+	training, testing, header = readDataSet(filename, trainingPercent)
+	//all := append(training, testing...)
 
-	log.Println(len(all), "entries detected.")
-
-	//fmt.Println(categoryName)
-	//os.Exit(1)
+	//log.Println(len(all), "entries detected.")
 
 	//fmt.Println("Total entropy:", Entropy(all))
-	//
 	//fmt.Println("Training entropy:", Entropy(training))
 	//fmt.Println("Testing entropy:", Entropy(testing))
-	//
 	//fmt.Println("Outlook Gain:", Gain(all, "outlook"))
 	//fmt.Println("Humidity Gain:", Gain(all, "humidity"))
 	//fmt.Println("Wind Gain:", Gain(all, "wind"))
@@ -428,22 +421,12 @@ func run() {
 
 	header = deleteFrom(header, categoryName)
 
-	//training = all
-	//testing = all
+	//log.Println("Training Length:", len(training))
+	//log.Println("Testing Length:", len(testing))
 
-	log.Println("Building tree")
-
-	log.Println("Training Length:", len(training))
-	log.Println("Testing Length:", len(testing))
-
-	start = time.Now()
 	tree := id3(training, header)
-	//log.Println("Tree building finished in", time.Since(start))
 
-	//start = time.Now()
-	//log.Println("Printing Tree")
 	//printTree(tree, 0)
-	//log.Println("Tree printing finished in", time.Since(start))
 
 	correct := 0
 	incorrect := 0
@@ -457,24 +440,42 @@ func run() {
 			incorrect++
 		}
 	}
+	accuracy := float64(correct)/float64(correct+incorrect)*100.0
+	//log.Println(accuracy, "% Accuracy\nID3 Done in", time.Since(start))
 
-	log.Println(float64(correct)/float64(correct+incorrect)*100.0, "% Accuracy")
-
-	log.Println("ID3 Done.\n")
+	return accuracy
 }
 
-//func findAttributes(entries []map[string]string) []string { // Why is this here
-//	var attributes []string
-//
-//	for _, entry := range entries {
-//		attributes = append(attributes, entry[])
-//	}
-//
-//	return attributes
-//}
+func test(filename string, trainingPercent float64, repetitions int){
+	var average []float64
+	log.Println("Running id3 on", filename, "with", trainingPercent*100, "% training.")
+
+
+	start := time.Now()
+	for i := 0; i < repetitions; i++ {
+		average = append(average, run(filename, trainingPercent))
+	}
+	log.Println(repetitions, "repetitions done in", time.Since(start))
+
+	total := 0.0
+	for _, val := range average {
+		total += val
+	}
+	total /= float64(len(average))
+
+	log.Println("Average Accuracy:", total, "\n")
+}
 
 func main() {
-	for i := 1; i < 2; i++ {
-		run()
-	}
+	repetitions := 100
+	trainingPercent := 0.50
+
+	filename := "data/tennis.txt"
+	test(filename, trainingPercent, repetitions)
+
+	filename = "data/tumor.txt"
+	test(filename, trainingPercent, repetitions)
+
+	filename = "data/mushrooms.txt"
+	test(filename, trainingPercent, repetitions)
 }
